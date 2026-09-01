@@ -895,6 +895,78 @@
     render();
   }
 
+  /* ---------- печать ----------
+     Для ретро-дневника печать не побочная функция. Формат
+     подставляется по стране, но переключается: у человека в США дома
+     может не быть A4, а у человека в России — Letter. */
+
+  function paperFormat() {
+    if (doc.print && doc.print.format) return doc.print.format;
+    var lang = (navigator.language || "").toLowerCase();
+    var letterLands = ["us", "ca", "mx", "ph", "cl", "co", "cr", "gt", "ni", "pa", "sv", "ve", "do"];
+    var region = lang.split("-")[1];
+    return region && letterLands.indexOf(region) >= 0 ? "Letter" : "A4";
+  }
+
+  function setPageStyle(format, landscape) {
+    var old = document.getElementById("page-style");
+    if (old) old.remove();
+    var st = document.createElement("style");
+    st.id = "page-style";
+    st.textContent = "@media print{@page{size:" + format + " " +
+                     (landscape ? "landscape" : "portrait") + ";margin:12mm}}";
+    document.head.appendChild(st);
+  }
+
+  function openPrintSheet() {
+    var fmt = paperFormat();
+    sheet("Напечатать", function (list, close) {
+      list.appendChild(item("Развороты недели · " + fmt + ", альбомно", function () {
+        setPageStyle(fmt, true);
+        close();
+        setTimeout(function () { window.print(); }, 120);
+      }));
+
+      ["A4", "Letter"].forEach(function (f) {
+        if (f === fmt) return;
+        list.appendChild(item("Сменить формат на " + f, function () {
+          change([{ path: ["print"], value: { format: f } }], "Печать: " + f);
+          close();
+        }));
+      });
+
+      /* Принтер умеет молча «вписать в страницу», и напечатанный
+         разворот окажется меньше настоящего. Линейка это ловит:
+         отрезок обязан быть ровно 100 мм. */
+      list.appendChild(item("Напечатать линейку для проверки", function () {
+        close();
+        printRuler(fmt);
+      }));
+    });
+  }
+
+  function printRuler(fmt) {
+    var box = el("div", "ruler-page");
+    box.id = "ruler-page";
+    box.innerHTML =
+      '<h2>Проверка принтера</h2>' +
+      '<p>Приложи линейку к отрезку ниже. Он должен быть ровно 100 миллиметров. ' +
+      'Если короче — принтер уменьшает страницу: в его настройках выключи ' +
+      '«вписать в страницу» и поставь масштаб 100 процентов.</p>' +
+      '<div class="ruler"><span class="ruler-tick">0</span><span class="ruler-tick">100 мм</span></div>' +
+      '<p class="ruler-note">Формат страницы: ' + fmt + '</p>';
+    document.body.appendChild(box);
+    document.body.classList.add("printing-ruler");
+    setPageStyle(fmt, false);
+    setTimeout(function () {
+      window.print();
+      setTimeout(function () {
+        document.body.classList.remove("printing-ruler");
+        box.remove();
+      }, 500);
+    }, 120);
+  }
+
   /* ---------- файл ---------- */
 
   function saveToFile() {
@@ -1015,7 +1087,7 @@
     $("#b-prev").addEventListener("click", function () { shiftWeek(-1); });
     $("#b-next").addEventListener("click", function () { shiftWeek(1); });
     $("#b-today").addEventListener("click", function () { weekId = D.weekId(new Date()); render(); });
-    $("#b-print").addEventListener("click", function () { window.print(); });
+    $("#b-print").addEventListener("click", openPrintSheet);
     $("#b-save").addEventListener("click", saveToFile);
     $("#b-open").addEventListener("click", openFromFile);
     $("#b-look").addEventListener("click", openLookSheet);
