@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Дневник">
+  <defs>
+    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7A4A38"/>
+      <stop offset="1" stop-color="#54301F"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="72" fill="url(#cloth)"/>
+  <rect x="56" y="56" width="34" height="400" fill="#000" opacity=".32"/>
+  <g fill="none" stroke="#B08A4A" stroke-width="5" opacity=".55">
+    <rect x="118" y="96" width="322" height="320"/>
+    <rect x="130" y="108" width="298" height="296"/>
+  </g>
+  <text x="284" y="300" text-anchor="middle"
+        font-family="'PT Sans Narrow','Arial Narrow',Arial,sans-serif"
+        font-size="196" font-weight="700" letter-spacing="6" fill="#C9A566">Д</text>
+</svg>

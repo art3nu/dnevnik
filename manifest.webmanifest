@@ -1,0 +1,17 @@
+{
+  "name": "Дневник",
+  "short_name": "Дневник",
+  "description": "Школьный дневник советского образца как рабочий планировщик: шестидневка, отметки, поведение, итоги недели.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#B9AE93",
+  "theme_color": "#6E4232",
+  "lang": "ru",
+  "categories": ["productivity", "education"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
