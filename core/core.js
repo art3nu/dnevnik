@@ -99,6 +99,43 @@ window.D = window.D || {};
     },
   };
 
+  /* ---------- графы ----------
+     Клетка адресуется как «день | урок | графа», поэтому добавление
+     своей графы не ломает уже записанное: старые клетки просто не
+     имеют значения в новой графе. */
+
+  D.COLUMN_KINDS = {
+    text: "строка",      // что задано, кабинет, учитель
+    mark: "отметка",     // по выбранной шкале
+    check: "галочка",    // сделано или нет
+  };
+
+  D.defaultColumns = function () {
+    return [
+      { id: "task", kind: "text", name: "Что задано", on: true, builtin: true, width: "auto" },
+      { id: "mark", kind: "mark", name: "Отм.", on: true, builtin: true, width: "52px" },
+    ];
+  };
+
+  // Готовые графы: человек выбирает из списка, а не придумывает поля.
+  D.COLUMN_LIBRARY = [
+    { id: "room", kind: "text", name: "Кабинет", width: "64px",
+      about: "номер кабинета рядом с уроком" },
+    { id: "teacher", kind: "text", name: "Учитель", width: "90px",
+      about: "кто ведёт" },
+    { id: "bring", kind: "text", name: "Принести", width: "auto",
+      about: "что взять с собой: альбом, форму, циркуль" },
+    { id: "done", kind: "check", name: "Сдал", width: "44px",
+      about: "галочка, что задание сдано" },
+    { id: "howlong", kind: "text", name: "Сколько заняло", width: "72px",
+      about: "время на домашку — видно, что съедает вечер" },
+  ];
+
+  D.columns = function (doc) {
+    var cols = (doc.template && doc.template.columns) || D.defaultColumns();
+    return cols.filter(function (c) { return c.on !== false; });
+  };
+
   D.BELLS = [
     ["1 урок", "09:00 — 09:45"],
     ["перемена", "09:45 — 09:55"],
@@ -134,11 +171,12 @@ window.D = window.D || {};
   D.PRESETS = {
     school5: {
       id: "school5",
-      name: "Пятый класс",
+      name: "Средние классы",
       about: "Шесть дней, пять уроков, пятибалльные отметки",
       scaleId: "ru5",
       days: 6,
       perDay: 5,
+      look: { scale: 1, tracking: 0, leading: 1.24 },
       subjects: ["Математика", "Русский язык", "Литература", "История",
                  "Английский", "Биология", "Физкультура", "Технология"],
     },
@@ -149,8 +187,22 @@ window.D = window.D || {};
       scaleId: "smiles",
       days: 5,
       perDay: 4,
+      look: { scale: 1.2, tracking: 0.01, leading: 1.5 },
       subjects: ["Чтение", "Письмо", "Математика", "Окружающий мир",
                  "Рисование", "Физкультура", "Музыка"],
+    },
+    senior: {
+      id: "senior",
+      name: "Старшие классы",
+      about: "Шесть дней, семь уроков, кабинеты и учителя",
+      scaleId: "ru5",
+      days: 6,
+      perDay: 7,
+      look: { scale: 0.95, tracking: 0, leading: 1.2 },
+      columns: ["room"],
+      subjects: ["Алгебра", "Геометрия", "Физика", "Химия", "Биология",
+                 "История", "Обществознание", "Английский", "Литература",
+                 "Русский язык", "Информатика", "Физкультура"],
     },
     grownup: {
       id: "grownup",
@@ -159,8 +211,38 @@ window.D = window.D || {};
       scaleId: "done",
       days: 6,
       perDay: 4,
+      look: { scale: 1, tracking: 0, leading: 1.3 },
       subjects: ["Работа", "Деньги", "Здоровье", "Дом", "Учёба", "Люди"],
     },
+  };
+
+  /* Что изменится, если примерить издание. Человеку показывают это
+     ДО применения, обычными словами и без чисел вроде «5 slots». */
+  D.presetDiff = function (doc, preset) {
+    var out = [];
+    var onDays = doc.template.days.filter(function (d) { return d.on; }).length;
+    if (preset.days !== onDays) {
+      out.push(onDays > preset.days
+        ? "учебных дней станет " + preset.days + " вместо " + onDays
+        : "учебных дней станет " + preset.days + " вместо " + onDays);
+    }
+    var maxSlots = doc.template.days.reduce(function (m, d) {
+      return Math.max(m, d.on ? d.slots.length : 0);
+    }, 0);
+    if (preset.perDay > maxSlots) out.push("уроков в дне станет до " + preset.perDay);
+    if (preset.scaleId !== doc.template.scaleId) {
+      out.push("отметки станут: " + D.SCALES[preset.scaleId].name.toLowerCase());
+    }
+    var look = doc.look || {};
+    if (preset.look && preset.look.scale > (look.scale || 1)) out.push("клетки станут крупнее");
+    if (preset.look && preset.look.scale < (look.scale || 1)) out.push("клетки станут мельче");
+    (preset.columns || []).forEach(function (cid) {
+      var have = (doc.template.columns || []).some(function (c) { return c.id === cid && c.on !== false; });
+      var lib = D.COLUMN_LIBRARY.find(function (c) { return c.id === cid; });
+      if (!have && lib) out.push("добавится графа «" + lib.name + "»");
+    });
+    out.push("записи и отметки останутся на месте");
+    return out;
   };
 
   /* ---------- создание документа ---------- */
@@ -193,11 +275,46 @@ window.D = window.D || {};
       created: Date.now(),
       updated: Date.now(),
       clock: 0,
-      template: { days: days, scaleId: preset.scaleId },
+      template: { days: days, scaleId: preset.scaleId, columns: D.defaultColumns() },
       subjects: s.subjects,
       weeks: {},
       look: { scale: 1, tracking: 0, leading: 1.24 },
     };
+  };
+
+  /* ---------- достройка документа ----------
+     Документ, созданный прежней версией, не выбрасывается и не
+     заменяется заготовкой: ему достраивается недостающее. Именно
+     на подмене заготовкой сгорела первая версия — правка расписания
+     молча пропадала, потому что форма данных «не совпала». */
+  D.upgrade = function (doc) {
+    if (!doc || !doc.template) return doc;
+    var touched = false;
+
+    if (!Array.isArray(doc.template.columns) || !doc.template.columns.length) {
+      doc.template.columns = D.defaultColumns();
+      touched = true;
+    }
+    // обязательные графы не должны потеряться ни при каком слиянии
+    ["task", "mark"].forEach(function (id) {
+      var has = doc.template.columns.some(function (c) { return c.id === id; });
+      if (!has) {
+        var base = D.defaultColumns().find(function (c) { return c.id === id; });
+        doc.template.columns.push(base);
+        touched = true;
+      }
+    });
+
+    if (!doc.look) { doc.look = { scale: 1, tracking: 0, leading: 1.24 }; touched = true; }
+    if (!doc.subjects) { doc.subjects = {}; touched = true; }
+    if (!doc.weeks) { doc.weeks = {}; touched = true; }
+    if (typeof doc.clock !== "number") { doc.clock = 0; touched = true; }
+    if (!doc.template.scaleId || !D.SCALES[doc.template.scaleId]) {
+      doc.template.scaleId = "ru5"; touched = true;
+    }
+
+    if (touched) doc.upgradedAt = Date.now();
+    return doc;
   };
 
   /* ---------- неделя ---------- */

@@ -317,10 +317,10 @@
 
   /* ---------- отметка ---------- */
 
-  function openMarkSheet(dayId, slotId, subjectLabel) {
+  function openMarkSheet(col, dayId, slotId, subjectLabel) {
     var scale = D.SCALES[doc.template.scaleId] || D.SCALES.ru5;
-    var cur = D.cellValue(doc, weekId, dayId, slotId, "mark");
-    sheet("Отметка · " + subjectLabel, function (list, close) {
+    var cur = D.cellValue(doc, weekId, dayId, slotId, col.id);
+    sheet(col.name + " · " + subjectLabel, function (list, close) {
       var row = el("div", "marks-row");
       scale.values.forEach(function (v) {
         var b = el("button", "sheet-item", v.label);
@@ -328,17 +328,140 @@
         b.setAttribute("aria-label", v.say);
         b.setAttribute("aria-pressed", cur && cur.v === v.v ? "true" : "false");
         b.addEventListener("click", function () {
-          setCell(dayId, slotId, "mark", v.v);
+          setCell(dayId, slotId, col.id, v.v);
           close();
         });
         row.appendChild(b);
       });
       list.appendChild(row);
       list.appendChild(item("Не выставлена", function () {
-        setCell(dayId, slotId, "mark", null);
+        setCell(dayId, slotId, col.id, null);
         close();
       }));
     });
+  }
+
+  /* ---------- графы ---------- */
+
+  function openColumnSheet(col) {
+    var all = (doc.template.columns || D.defaultColumns());
+    var idx = all.findIndex(function (c) { return c.id === col.id; });
+    sheet("Графа «" + col.name + "»", function (list, close) {
+      list.appendChild(item("+ Добавить графу", function () { close(); openAddColumnSheet(); }));
+
+      if (col.kind === "mark") {
+        list.appendChild(item("Шкала отметок: " + (D.SCALES[doc.template.scaleId] || {}).name,
+          function () { close(); openScaleSheet(); }));
+      }
+
+      var row = el("div", "sheet-row");
+      if (idx > 0) {
+        row.appendChild(item("Левее", function () { moveColumn(idx, -1); close(); }));
+      }
+      if (idx < all.length - 1) {
+        row.appendChild(item("Правее", function () { moveColumn(idx, 1); close(); }));
+      }
+      if (row.children.length) list.appendChild(row);
+
+      if (!col.builtin) {
+        // Записи не удаляются вместе с графой: графу можно вернуть,
+        // и всё, что в ней было, окажется на месте.
+        list.appendChild(item("Убрать графу с разворота", function () {
+          change([{ path: ["template", "columns", idx, "on"], value: false }],
+                 "Графа «" + col.name + "» убрана");
+          close();
+        }, "danger"));
+      } else {
+        list.appendChild(item("Эту графу убрать нельзя", function () {}, ""));
+      }
+    });
+  }
+
+  function moveColumn(idx, dir) {
+    var cols = doc.template.columns;
+    var a = JSON.parse(JSON.stringify(cols[idx]));
+    var b = JSON.parse(JSON.stringify(cols[idx + dir]));
+    change([
+      { path: ["template", "columns", idx], value: b },
+      { path: ["template", "columns", idx + dir], value: a },
+    ], "Графы переставлены");
+  }
+
+  function openAddColumnSheet() {
+    var have = {};
+    (doc.template.columns || []).forEach(function (c) { have[c.id] = c; });
+    sheet("Какую графу добавить", function (list, close) {
+      D.COLUMN_LIBRARY.forEach(function (lib) {
+        var existing = have[lib.id];
+        if (existing && existing.on !== false) return;      // уже стоит
+        var label = lib.name + " — " + lib.about + (existing ? " · вернётся с записями" : "");
+        list.appendChild(item(label, function () {
+          if (existing) {
+            var i = doc.template.columns.findIndex(function (c) { return c.id === lib.id; });
+            change([{ path: ["template", "columns", i, "on"], value: true }],
+                   "Графа «" + lib.name + "» вернулась");
+          } else {
+            var col = Object.assign({}, lib, { on: true, builtin: false });
+            change([{ path: ["template", "columns", doc.template.columns.length], insert: col }],
+                   "Графа «" + lib.name + "» добавлена");
+          }
+          close();
+        }));
+      });
+      list.appendChild(item("+ Своя графа", function () {
+        close();
+        var name = prompt("Как назвать графу?");
+        if (!name || !name.trim()) return;
+        var col = { id: "c" + D.newId(), kind: "text", name: name.trim(), on: true,
+                    builtin: false, width: "auto" };
+        change([{ path: ["template", "columns", doc.template.columns.length], insert: col }],
+               "Графа «" + col.name + "» добавлена");
+      }));
+    });
+  }
+
+  /* ---------- шкала ----------
+     Шкала меняет только то, ЧЕМ рисуется отметка. Сами отметки лежат
+     числами и никуда не деваются: пятёрка становится улыбкой и обратно
+     без потери. */
+  function openScaleSheet() {
+    sheet("Чем ставить отметки", function (list, close) {
+      Object.keys(D.SCALES).forEach(function (sid) {
+        var s = D.SCALES[sid];
+        var preview = s.values.map(function (v) { return v.label; }).join(" ");
+        var b = item(s.name + "   " + preview, function () {
+          change([{ path: ["template", "scaleId"], value: sid }], "Отметки: " + s.name);
+          close();
+        });
+        b.setAttribute("aria-pressed", doc.template.scaleId === sid ? "true" : "false");
+        list.appendChild(b);
+      });
+      var lost = countUnrepresentable();
+      if (lost.length) {
+        var warn = el("div", "sheet-item", "В другой шкале не показать: " + lost.join(", ") +
+          ". Записи не пропадут — вернёшь шкалу, и они снова видны.");
+        warn.style.cssText = "font-family:var(--f-serif);font-style:italic;font-size:13px";
+        list.appendChild(warn);
+      }
+    });
+  }
+
+  // Честная проверка: в шкале «сделано или нет» четвёрок нет, и молча
+  // превращать их в тройки нельзя.
+  function countUnrepresentable() {
+    var out = {};
+    Object.keys(doc.weeks).forEach(function (wid) {
+      var cells = doc.weeks[wid].cells;
+      Object.keys(cells).forEach(function (k) {
+        if (k.indexOf("|mark") < 0) return;
+        var v = cells[k].v;
+        var seen = Object.keys(D.SCALES).some(function (sid) {
+          return D.SCALES[sid].values.some(function (x) { return x.v === v; });
+        });
+        if (!seen) out[v] = true;
+      });
+    });
+    return Object.keys(out);
   }
 
   /* ---------- урок ---------- */
@@ -505,12 +628,29 @@
 
     var thead = el("thead");
     var hr = el("tr");
-    [["", "c-n"], ["Предмет", "c-subj"], ["Что задано", ""], ["Отм.", "c-mark"], ["", "c-more"]]
-      .forEach(function (h) {
-        var th = el("th", h[1], h[0]);
-        th.scope = "col";
-        hr.appendChild(th);
-      });
+    var head = [["", "c-n", null], ["Предмет", "c-subj", null]];
+    D.columns(doc).forEach(function (c) {
+      head.push([c.name, c.kind === "mark" ? "c-mark" : (c.kind === "check" ? "c-check" : ""), c]);
+    });
+    head.push(["", "c-more", null]);
+
+    head.forEach(function (h) {
+      var th = el("th", h[1], h[0]);
+      th.scope = "col";
+      if (h[2] && h[2].width && h[2].width !== "auto") th.style.width = h[2].width;
+      if (h[2]) {
+        // тап по названию графы — что с ней сделать
+        th.classList.add("th-col");
+        th.tabIndex = 0;
+        th.setAttribute("role", "button");
+        th.setAttribute("aria-label", "графа «" + h[2].name + "», настроить");
+        th.addEventListener("click", function () { openColumnSheet(h[2]); });
+        th.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openColumnSheet(h[2]); }
+        });
+      }
+      hr.appendChild(th);
+    });
     thead.appendChild(hr);
     table.appendChild(thead);
 
@@ -527,6 +667,61 @@
     add.addEventListener("click", function () { addSlot(dayIdx); });
     wrap.appendChild(add);
     return wrap;
+  }
+
+  /* Одна клетка графы. Вид зависит только от рода графы, а не от её
+     названия: графа «Кабинет», добавленная ребёнком, набирается той же
+     типографикой, что и заводская, потому что род у неё «строка». */
+  function cellFor(col, day, slot, slotIdx) {
+    var td = el("td", col.kind === "mark" ? "c-mark" : (col.kind === "check" ? "c-check" : ""));
+    if (col.width && col.width !== "auto") td.style.width = col.width;
+    var cur = D.cellValue(doc, weekId, day.id, slot.id, col.id);
+    var subj = subjectName(slot.subjectId) || "урок " + (slotIdx + 1);
+
+    if (col.kind === "mark") {
+      var scale = D.SCALES[doc.template.scaleId] || D.SCALES.ru5;
+      var found = cur ? scale.values.find(function (v) { return v.v === cur.v; }) : null;
+      var mb = el("button", "mark", found ? found.label : "·");
+      mb.type = "button";
+      mb.dataset.empty = found ? "false" : "true";
+      if (found) mb.dataset.mark = String(found.v);
+      mb.setAttribute("aria-label", found
+        ? col.name + " " + found.say + " за " + subj + ", изменить"
+        : col.name + " за " + subj + " не выставлена, поставить");
+      mb.addEventListener("click", function () { openMarkSheet(col, day.id, slot.id, subj); });
+      td.appendChild(mb);
+      return td;
+    }
+
+    if (col.kind === "check") {
+      var on = cur && cur.v === true;
+      var cb = el("button", "check" + (on ? "" : " off"), on ? "✓" : "·");
+      cb.type = "button";
+      cb.setAttribute("aria-pressed", on ? "true" : "false");
+      cb.setAttribute("aria-label", col.name + " за " + subj);
+      cb.addEventListener("click", function () {
+        setCell(day.id, slot.id, col.id, on ? null : true);
+      });
+      td.appendChild(cb);
+      return td;
+    }
+
+    // строка: правится прямо в клетке
+    var box = el("div", "task");
+    box.contentEditable = "plaintext-only";
+    if (box.contentEditable !== "plaintext-only") box.contentEditable = "true";
+    box.textContent = cur ? String(cur.v) : "";
+    if (cur && cur.demo) box.classList.add("cell-demo");
+    box.setAttribute("data-ph", col.id === "task" ? "что задано" : col.name.toLowerCase());
+    box.setAttribute("aria-label", col.name + " · " + subj);
+    box.addEventListener("blur", function () {
+      var text = box.textContent.trim();
+      var was = D.cellValue(doc, weekId, day.id, slot.id, col.id);
+      if ((was ? String(was.v) : "") !== text) setCell(day.id, slot.id, col.id, text);
+    });
+    box.addEventListener("keydown", function (e) { if (e.key === "Escape") box.blur(); });
+    td.appendChild(box);
+    return td;
   }
 
   function slotRow(day, dayIdx, slot, slotIdx, week) {
@@ -551,44 +746,10 @@
     tdS.appendChild(el("span", "time", D.lessonTime(slotIdx)));
     tr.appendChild(tdS);
 
-    // что задано
-    var tdT = el("td");
-    var task = el("div", "task");
-    task.contentEditable = "plaintext-only";
-    if (task.contentEditable !== "plaintext-only") task.contentEditable = "true";
-    var cell = D.cellValue(doc, weekId, day.id, slot.id, "task");
-    task.textContent = cell ? String(cell.v) : "";
-    if (cell && cell.demo) task.classList.add("cell-demo");
-    task.setAttribute("data-ph", "что задано");
-    task.setAttribute("aria-label", "что задано на " + (subjectName(slot.subjectId) || "урок"));
-    task.addEventListener("blur", function () {
-      var text = task.textContent.trim();
-      var was = D.cellValue(doc, weekId, day.id, slot.id, "task");
-      if ((was ? String(was.v) : "") !== text) setCell(day.id, slot.id, "task", text);
+    // графы: их состав задаёт сам человек
+    D.columns(doc).forEach(function (col) {
+      tr.appendChild(cellFor(col, day, slot, slotIdx));
     });
-    task.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") task.blur();
-    });
-    tdT.appendChild(task);
-    tr.appendChild(tdT);
-
-    // отметка
-    var tdM = el("td", "c-mark");
-    var scale = D.SCALES[doc.template.scaleId] || D.SCALES.ru5;
-    var mark = D.cellValue(doc, weekId, day.id, slot.id, "mark");
-    var found = mark ? scale.values.find(function (v) { return v.v === mark.v; }) : null;
-    var mb = el("button", "mark", found ? found.label : "·");
-    mb.type = "button";
-    mb.dataset.empty = found ? "false" : "true";
-    if (found) mb.dataset.mark = String(found.v);
-    mb.setAttribute("aria-label", found
-      ? "отметка " + found.say + ", изменить"
-      : "отметка не выставлена, поставить");
-    mb.addEventListener("click", function () {
-      openMarkSheet(day.id, slot.id, subjectName(slot.subjectId) || "урок " + (slotIdx + 1));
-    });
-    tdM.appendChild(mb);
-    tr.appendChild(tdM);
 
     // меню урока
     var tdMore = el("td", "c-more");
@@ -611,6 +772,100 @@
     journal = new D.Journal(200);
     await D.Store.setMeta("active", id);
     render();
+  }
+
+  /* ---------- издания ----------
+     Издание выбирается по картинке разворота, а не по названию:
+     на миниатюре сразу видно, сколько дней, сколько уроков и чем
+     ставятся отметки. */
+
+  function presetPreview(preset) {
+    var box = el("div", "preview");
+    var scale = D.SCALES[preset.scaleId];
+    for (var d = 0; d < Math.min(preset.days, 6); d++) {
+      var col = el("div", "preview-day");
+      for (var s = 0; s < Math.min(preset.perDay, 7); s++) {
+        var line = el("div", "preview-line");
+        if (s === 0 && d < 2) line.classList.add("filled");
+        col.appendChild(line);
+      }
+      box.appendChild(col);
+    }
+    var mark = el("div", "preview-mark", scale.values[0].label);
+    box.appendChild(mark);
+    return box;
+  }
+
+  function openPresetSheet() {
+    sheet("Взять готовое расписание", function (list, close) {
+      Object.keys(D.PRESETS).forEach(function (pid) {
+        var p = D.PRESETS[pid];
+        var b = el("button", "sheet-item preset", null);
+        b.type = "button";
+        b.appendChild(presetPreview(p));
+        var text = el("div", "preset-text");
+        text.appendChild(el("div", "preset-name", p.name));
+        text.appendChild(el("div", "preset-about", p.about));
+        b.appendChild(text);
+        b.setAttribute("aria-pressed", doc.presetId === pid ? "true" : "false");
+        b.addEventListener("click", function () { close(); confirmPreset(p); });
+        list.appendChild(b);
+      });
+    });
+  }
+
+  function confirmPreset(preset) {
+    sheet("Примерить «" + preset.name + "»", function (list, close) {
+      var what = el("div", "sheet-item what");
+      what.appendChild(el("div", null, "Что изменится:"));
+      var ul = el("ul", "whatlist");
+      D.presetDiff(doc, preset).forEach(function (line) {
+        ul.appendChild(el("li", null, line));
+      });
+      what.appendChild(ul);
+      list.appendChild(what);
+      list.appendChild(item("Примерить", function () { applyPreset(preset); close(); }));
+    });
+  }
+
+  function applyPreset(preset) {
+    var ops = [];
+    ops.push({ path: ["presetId"], value: preset.id });
+    ops.push({ path: ["template", "scaleId"], value: preset.scaleId });
+    if (preset.look) ops.push({ path: ["look"], value: preset.look });
+
+    // предметы издания попадают в ленту подсказок
+    var have = {};
+    Object.keys(doc.subjects).forEach(function (id) {
+      have[doc.subjects[id].name.toLowerCase()] = true;
+    });
+    preset.subjects.forEach(function (name) {
+      if (have[name.toLowerCase()]) return;
+      var id = D.newId();
+      ops.push({ path: ["subjects", id], value: { id: id, name: name } });
+    });
+
+    // дни: лишние гаснут, но не удаляются — записи в них целы
+    doc.template.days.forEach(function (day, i) {
+      var on = i < preset.days;
+      if (!!day.on !== on) ops.push({ path: ["template", "days", i, "on"], value: on });
+      if (!on) return;
+      // уроки только добавляются: убрать урок значит спрятать записи
+      for (var k = day.slots.length; k < preset.perDay; k++) {
+        ops.push({ path: ["template", "days", i, "slots", k],
+                   insert: { id: D.newId(), subjectId: null } });
+      }
+    });
+
+    (preset.columns || []).forEach(function (cid) {
+      var idx = (doc.template.columns || []).findIndex(function (c) { return c.id === cid; });
+      var lib = D.COLUMN_LIBRARY.find(function (c) { return c.id === cid; });
+      if (idx >= 0) ops.push({ path: ["template", "columns", idx, "on"], value: true });
+      else if (lib) ops.push({ path: ["template", "columns", doc.template.columns.length],
+                              insert: Object.assign({}, lib, { on: true, builtin: false }) });
+    });
+
+    change(ops, "Издание «" + preset.name + "» примерено");
   }
 
   function openNewDocSheet() {
@@ -709,11 +964,9 @@
         list.appendChild(row);
       });
 
-      list.appendChild(item("Шкала отметок: " + (D.SCALES[doc.template.scaleId] || {}).name, function () {
-        var ids = Object.keys(D.SCALES);
-        var next = ids[(ids.indexOf(doc.template.scaleId) + 1) % ids.length];
-        change([{ path: ["template", "scaleId"], value: next }], "Шкала: " + D.SCALES[next].name);
-      }));
+      list.appendChild(item("Чем ставить отметки: " + (D.SCALES[doc.template.scaleId] || {}).name,
+        function () { openScaleSheet(); }));
+      list.appendChild(item("Графы разворота", function () { openAddColumnSheet(); }));
     });
   }
 
@@ -748,6 +1001,11 @@
     var activeId = await D.Store.getMeta("active");
     doc = docs.find(function (d) { return d.id === activeId; }) || docs[0];
 
+    // Документ прежней версии достраивается, а не подменяется заготовкой.
+    var before = JSON.stringify(doc);
+    D.upgrade(doc);
+    if (JSON.stringify(doc) !== before) await D.Store.putDoc(doc);
+
     render();
     status(docs.length > 1
       ? docs.length + " " + D.plural(docs.length, "дневник", "дневника", "дневников") + " на этом устройстве"
@@ -761,6 +1019,7 @@
     $("#b-save").addEventListener("click", saveToFile);
     $("#b-open").addEventListener("click", openFromFile);
     $("#b-look").addEventListener("click", openLookSheet);
+    $("#b-preset").addEventListener("click", openPresetSheet);
 
     // половины разворота на узком экране
     var spread = $("#spread");
