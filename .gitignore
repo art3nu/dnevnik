@@ -1,0 +1,9 @@
+# Личное — не публикуется
+personal/
+*.local.json
+dnevnik-nedelya-*.json
+
+# Системное
+.DS_Store
+Thumbs.db
+desktop.ini
