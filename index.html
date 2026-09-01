@@ -863,7 +863,22 @@ function bindTabs(){
 }
 
 /* ================= КНОПКИ ================= */
+/* Сохранение файла. На диске и на GitHub Pages — обычная ссылка.
+   Внутри просмотрщика артефактов ссылки не работают: там файл отдаётся
+   через claude.use("downloads"), и подтверждает его сам зритель. */
+var DL = null;
+if(window.claude && typeof window.claude.use === "function"){
+  try{ window.claude.use("downloads").then(function(ns){ DL = ns; }, function(){}); }catch(e){}
+}
 function download(name, text){
+  if(DL && typeof DL.save === "function"){
+    DL.save({filename:name, data:text}).catch(function(err){
+      var code = err && err.code;
+      if(code === "declined" || code === "rate_limited") return;
+      alert("Сохранить файл не удалось. Дневник цел — он лежит в браузере, попробуй ещё раз или открой его локальной копией.");
+    });
+    return;
+  }
   var blob = new Blob([text], {type:"application/json;charset=utf-8"});
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
