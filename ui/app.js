@@ -761,6 +761,32 @@
     $("#b-save").addEventListener("click", saveToFile);
     $("#b-open").addEventListener("click", openFromFile);
     $("#b-look").addEventListener("click", openLookSheet);
+
+    // половины разворота на узком экране
+    var spread = $("#spread");
+    function showHalf(which) {
+      var target = which === "b" ? spread.clientWidth : 0;
+      var smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      try {
+        spread.scrollTo({ left: target, behavior: smooth ? "smooth" : "auto" });
+      } catch (e) {
+        spread.scrollLeft = target;
+      }
+      // Плавная прокрутка выполняется не везде, а страница обязана
+      // перевернуться. Проверяем и дожимаем.
+      setTimeout(function () {
+        if (Math.abs(spread.scrollLeft - target) > 4) spread.scrollLeft = target;
+      }, 350);
+      $("#half-a").setAttribute("aria-pressed", which === "a" ? "true" : "false");
+      $("#half-b").setAttribute("aria-pressed", which === "b" ? "true" : "false");
+    }
+    $("#half-a").addEventListener("click", function () { showHalf("a"); });
+    $("#half-b").addEventListener("click", function () { showHalf("b"); });
+    spread.addEventListener("scroll", function () {
+      var b = spread.scrollLeft > spread.clientWidth / 2;
+      $("#half-a").setAttribute("aria-pressed", b ? "false" : "true");
+      $("#half-b").setAttribute("aria-pressed", b ? "true" : "false");
+    }, { passive: true });
     $("#toast-undo").addEventListener("click", undo);
     $("#b-clear-demo").addEventListener("click", function () {
       change(clearDemoExcept(null), "Пример убран");

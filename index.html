@@ -39,7 +39,14 @@
       <button class="btn primary" id="b-clear-demo" type="button">Очистить и вписать своё</button>
     </div>
 
-    <div class="spread">
+    <!-- на телефоне разворот листается, поэтому нужен видимый указатель,
+         что у недели есть вторая половина -->
+    <div class="halves" id="halves">
+      <button class="half" id="half-a" type="button" aria-pressed="true">Пн — Ср</button>
+      <button class="half" id="half-b" type="button" aria-pressed="false">Чт — Сб</button>
+    </div>
+
+    <div class="spread" id="spread">
       <div class="leaf" id="leaf-a"></div>
       <div class="leaf" id="leaf-b"></div>
     </div>
