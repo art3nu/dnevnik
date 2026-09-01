@@ -613,6 +613,70 @@ window.D = window.D || {};
     return doc;
   };
 
+  /* ============================================================
+     РАСПИСАНИЕ ССЫЛКОЙ
+     Староста настроил расписание один раз — и раздал классу. Ссылка
+     кладётся в чат, одноклассник открывает и принимает; ставить и
+     регистрировать ничего не надо.
+
+     Кодировка нарочно человекочитаемая, а не двоичная: ссылку видно
+     глазами, её можно проверить и поправить руками, и она переживает
+     пересылку через мессенджеры, которые ломают длинные закорючки.
+     Передаётся ТОЛЬКО расписание — ни отметок, ни домашних заданий,
+     ни имени ребёнка. Делиться дневником и делиться расписанием —
+     разные вещи.
+     ============================================================ */
+
+  var DAY_CODES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+  D.scheduleToLink = function (doc, base) {
+    var parts = [];
+    doc.template.days.forEach(function (day, i) {
+      if (!day.on) return;
+      var names = day.slots.map(function (s) {
+        var subj = doc.subjects[s.subjectId];
+        return subj ? subj.name.replace(/[~:,|]/g, " ").trim() : "";
+      });
+      while (names.length && !names[names.length - 1]) names.pop();
+      if (!names.length) return;
+      parts.push((DAY_CODES[i] || String(i)) + ":" + names.join(","));
+    });
+    if (!parts.length) return null;
+    /* Кириллицу в хеше не кодируем: encodeURIComponent раздувает каждую
+       букву в девять знаков, и ссылка на неделю переваливает за полторы
+       тысячи символов — такую в чат не пошлёшь. Браузеры принимают
+       кириллицу в хеше как есть, экранировать нужно только то, что
+       ломает разбор самой ссылки. */
+    var payload = parts.join("~")
+      .replace(/%/g, "%25").replace(/#/g, "%23")
+      .replace(/&/g, "%26").replace(/\?/g, "%3F")
+      .replace(/ /g, "_");
+    var url = (base || (location.origin + location.pathname));
+    return url + "#r=" + payload;
+  };
+
+  D.linkToSchedule = function (hash) {
+    var m = String(hash || "").match(/[#&]r=([^&]+)/);
+    if (!m) return null;
+    var payload;
+    try { payload = decodeURIComponent(m[1]).replace(/_/g, " "); }
+    catch (e) { payload = m[1].replace(/_/g, " "); }   // ссылка пришла неэкранированной
+    var days = [];
+    payload.split("~").forEach(function (chunk) {
+      var idx = chunk.indexOf(":");
+      if (idx < 0) return;
+      var code = chunk.slice(0, idx).trim();
+      var di = DAY_CODES.indexOf(code);
+      if (di < 0) di = Number(code);
+      if (!(di >= 0 && di < 6)) return;
+      var names = chunk.slice(idx + 1).split(",").map(function (s) { return s.trim(); });
+      days.push({ day: di, name: DAY_NAMES_FULL[di], subjects: names });
+    });
+    return days.length ? days : null;
+  };
+
+  var DAY_NAMES_FULL = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+
   /* ---------- файл ---------- */
 
   D.toFile = function (doc) {

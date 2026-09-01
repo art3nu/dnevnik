@@ -565,6 +565,7 @@
   function render() {
     renderCover();
     renderSpread();
+    renderSignature();
     applyLook();
   }
 
@@ -893,6 +894,163 @@
     d.setDate(d.getDate() + delta * 7);
     weekId = D.weekId(d);
     render();
+  }
+
+  /* ============================================================
+     РАЗДАТЬ РАСПИСАНИЕ КЛАССУ
+     Один человек настроил — двадцать телефонов получили. Через ссылку
+     в чат класса: ставить и заводить ничего не надо.
+     ============================================================ */
+
+  function openShareSheet() {
+    var link = D.scheduleToLink(doc);
+    sheet("Раздать расписание", function (list, close) {
+      if (!link) {
+        list.appendChild(item("Сначала впиши хоть один урок", function () { close(); }));
+        return;
+      }
+
+      var about = el("div", "sheet-item what");
+      about.textContent = "Ссылка ниже несёт ТОЛЬКО расписание уроков. Ни отметок, " +
+        "ни домашних заданий, ни имени — их в ней нет. Кинь её в чат класса: " +
+        "кто откроет, тот получит то же расписание себе.";
+      list.appendChild(about);
+
+      var box = el("div", "sheet-item linkbox");
+      box.textContent = link;
+      list.appendChild(box);
+
+      list.appendChild(item("Скопировать ссылку", function () {
+        copyText(link, "Ссылка скопирована — вставь её в чат класса");
+        close();
+      }));
+
+      if (navigator.share) {
+        list.appendChild(item("Поделиться", function () {
+          navigator.share({ title: "Расписание уроков", text: "Наше расписание", url: link })
+            .catch(function () {});
+          close();
+        }));
+      }
+    });
+  }
+
+  function copyText(text, okMessage) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast(okMessage); },
+        function () { fallbackCopy(text, okMessage); });
+    } else {
+      fallbackCopy(text, okMessage);
+    }
+  }
+
+  function fallbackCopy(text, okMessage) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); toast(okMessage); }
+    catch (e) { toast("Скопируй ссылку вручную из окошка выше"); }
+    document.body.removeChild(ta);
+  }
+
+  /* Открыли ссылку с чужим расписанием. Ничего не применяется само:
+     человек видит, что придёт, и решает сам. */
+  function checkIncomingLink() {
+    var incoming = D.linkToSchedule(location.hash);
+    if (!incoming) return;
+    history.replaceState(null, "", location.pathname + location.search);
+
+    sheet("Принять расписание?", function (list, close) {
+      var about = el("div", "sheet-item what");
+      about.textContent = "Кто-то поделился расписанием. Отметки и домашние задания " +
+        "останутся твоими — заменятся только предметы по дням.";
+      list.appendChild(about);
+
+      incoming.forEach(function (d) {
+        var card = el("div", "parsed-day");
+        var head = el("div", "parsed-dayhead");
+        head.appendChild(el("span", "parsed-dayname", d.name));
+        head.appendChild(el("span", "parsed-count", d.subjects.length + " " +
+          D.plural(d.subjects.length, "урок", "урока", "уроков")));
+        card.appendChild(head);
+        card.appendChild(el("div", "parsed-plain", d.subjects.filter(Boolean).join(" · ")));
+        list.appendChild(card);
+      });
+
+      list.appendChild(item("Взять себе", function () {
+        applyIncoming(incoming);
+        close();
+      }));
+      list.appendChild(item("Не надо", function () { close(); }, "danger"));
+    });
+  }
+
+  function applyIncoming(incoming) {
+    var ops = [];
+    var count = 0;
+    incoming.forEach(function (inc) {
+      var dayIdx = inc.day;
+      if (dayIdx >= doc.template.days.length) return;
+      var day = doc.template.days[dayIdx];
+      if (!day.on) ops.push({ path: ["template", "days", dayIdx, "on"], value: true });
+
+      inc.subjects.forEach(function (name, i) {
+        var sid = null;
+        var clean = String(name).trim();
+        if (clean) {
+          var found = null;
+          Object.keys(doc.subjects).forEach(function (id) {
+            if (doc.subjects[id].name.toLowerCase() === clean.toLowerCase()) found = id;
+          });
+          sid = found;
+          if (!sid) {
+            sid = D.newId();
+            ops.push({ path: ["subjects", sid], value: { id: sid, name: clean } });
+          }
+        }
+        if (i < day.slots.length) {
+          ops.push({ path: ["template", "days", dayIdx, "slots", i, "subjectId"], value: sid });
+        } else {
+          ops.push({ path: ["template", "days", dayIdx, "slots", i],
+                     insert: { id: D.newId(), subjectId: sid } });
+        }
+        count++;
+      });
+    });
+    if (ops.length) {
+      change(ops, "Расписание принято: " + count + " " +
+                  D.plural(count, "урок", "урока", "уроков"));
+    }
+  }
+
+  /* ---------- подпись за неделю ----------
+     Графа из настоящего дневника: родитель расписывался за неделю.
+     Здесь это одно касание, и видно, кто и когда. */
+
+  function toggleSignature() {
+    var w = doc.weeks[weekId];
+    if (!w) {
+      D.applyOps(doc, [{ path: ["weeks", weekId], value: { cells: {}, struck: {} } }]);
+      w = doc.weeks[weekId];
+    }
+    if (w.signed) {
+      change([{ path: ["weeks", weekId, "signed"], value: undefined }], "Подпись снята");
+    } else {
+      change([{ path: ["weeks", weekId, "signed"],
+                value: { at: Date.now() } }], "Неделя подписана");
+    }
+  }
+
+  function renderSignature() {
+    var w = doc.weeks[weekId];
+    var btn = $("#b-sign");
+    if (!btn) return;
+    var signed = w && w.signed;
+    btn.textContent = signed ? "Подписано ✓" : "Подпись за неделю";
+    btn.setAttribute("aria-pressed", signed ? "true" : "false");
+    btn.classList.toggle("signed", !!signed);
   }
 
   /* ============================================================
@@ -1298,6 +1456,8 @@
     $("#b-look").addEventListener("click", openLookSheet);
     $("#b-preset").addEventListener("click", openPresetSheet);
     $("#b-paste").addEventListener("click", openPasteSheet);
+    $("#b-share").addEventListener("click", openShareSheet);
+    $("#b-sign").addEventListener("click", toggleSignature);
 
     // половины разворота на узком экране
     var spread = $("#spread");
@@ -1338,6 +1498,13 @@
         if (!inCell) { e.preventDefault(); undo(); }
       }
     });
+
+    checkIncomingLink();
+
+    /* Ссылку могут открыть, когда дневник уже открыт: тогда браузер
+       меняет только хеш и страницу не перезагружает, а предложение
+       принять расписание обязано появиться всё равно. */
+    window.addEventListener("hashchange", checkIncomingLink);
 
     if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
       navigator.serviceWorker.register("sw.js").catch(function () {});
