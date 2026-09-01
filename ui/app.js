@@ -895,6 +895,211 @@
     render();
   }
 
+  /* ============================================================
+     РАСПИСАНИЕ ТЕКСТОМ
+     Родителю присылают расписание в чат класса. Он его копирует,
+     вставляет — и дневник раскладывает по дням. Вставка и есть
+     команда: кнопки «разобрать» нет.
+     ============================================================ */
+
+  function openPasteSheet() {
+    sheet("Вставь расписание текстом", function (list, close) {
+      var hint = el("div", "sheet-item what");
+      hint.textContent = "Скопируй расписание из чата класса, с сайта школы или из " +
+        "электронного дневника и вставь сюда. Разберу и покажу, что получилось, — " +
+        "менять и подтверждать будешь сам.";
+      list.appendChild(hint);
+
+      var area = el("textarea", "paste-area");
+      area.setAttribute("placeholder",
+        "Понедельник\n1. Математика\n2. Русский язык\n3. Физ-ра");
+      area.setAttribute("aria-label", "текст расписания");
+      list.appendChild(area);
+
+      var go = item("Разобрать", function () {
+        var text = area.value.trim();
+        if (!text) return;
+        close();
+        showParseResult(D.parseSchedule(text));
+      });
+      list.appendChild(go);
+
+      setTimeout(function () { area.focus(); }, 60);
+      // вставка сама запускает разбор
+      area.addEventListener("paste", function () {
+        setTimeout(function () {
+          var text = area.value.trim();
+          if (text.length > 12) { close(); showParseResult(D.parseSchedule(text)); }
+        }, 40);
+      });
+    });
+  }
+
+  function showParseResult(res) {
+    sheet("Что получилось", function (list, close) {
+      var verdict = el("div", "sheet-item verdict");
+      verdict.textContent = res.verdict;
+      list.appendChild(verdict);
+
+      if (!res.days.length) {
+        // Ноль уроков — законный результат, но он обязан быть объяснён.
+        // Пустой разбор никогда не перезаписывает сохранённую неделю.
+        if (res.unparsed && res.unparsed.length) list.appendChild(unparsedBox(res.unparsed));
+        list.appendChild(item("Понятно", function () { close(); }));
+        return;
+      }
+
+      // дни карточками, уроки строками; всё правится по месту
+      res.days.forEach(function (day, di) {
+        var card = el("div", "parsed-day");
+        var head = el("div", "parsed-dayhead");
+
+        if (day.day === null) {
+          // День назвать обязан человек: разборщик не подставляет
+          // понедельник и не берёт «сегодня».
+          var ask = el("select", "day-pick");
+          ask.setAttribute("aria-label", "какой это день");
+          var empty = el("option", null, "какой это день?");
+          empty.value = "";
+          ask.appendChild(empty);
+          ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"].forEach(function (n, i) {
+            var o = el("option", null, n); o.value = String(i); ask.appendChild(o);
+          });
+          ask.addEventListener("change", function () {
+            day.day = ask.value === "" ? null : Number(ask.value);
+            day.name = ask.value === "" ? null : ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"][ask.value];
+            refreshApplyButton();
+          });
+          head.appendChild(ask);
+        } else {
+          head.appendChild(el("span", "parsed-dayname", day.name));
+        }
+        head.appendChild(el("span", "parsed-count",
+          day.lessons.length + " " + D.plural(day.lessons.length, "урок", "урока", "уроков")));
+        card.appendChild(head);
+
+        day.lessons.forEach(function (les, li) {
+          var row = el("div", "parsed-lesson");
+          row.appendChild(el("span", "parsed-num", String(les.num || li + 1)));
+
+          var name = el("input", "parsed-name" + (les.how === "не узнала" ? " unknown" : ""));
+          name.value = les.subject;
+          name.setAttribute("aria-label", "предмет, урок " + (li + 1));
+          name.addEventListener("input", function () { les.subject = name.value; });
+          row.appendChild(name);
+
+          var meta = [];
+          if (les.room) meta.push("каб. " + les.room);
+          if (les.time) meta.push(les.time);
+          if (les.note) meta.push(les.note);
+          if (meta.length) row.appendChild(el("span", "parsed-meta", meta.join(" · ")));
+
+          var del = el("button", "parsed-del", "×");
+          del.type = "button";
+          del.setAttribute("aria-label", "убрать этот урок");
+          del.addEventListener("click", function () {
+            day.lessons.splice(li, 1);
+            close();
+            showParseResult(res);
+          });
+          row.appendChild(del);
+          card.appendChild(row);
+        });
+        list.appendChild(card);
+      });
+
+      if (res.unparsed && res.unparsed.length) list.appendChild(unparsedBox(res.unparsed));
+
+      var apply = item("Записать в дневник", function () {
+        applyParsed(res);
+        close();
+      });
+      apply.id = "apply-parsed";
+      list.appendChild(apply);
+      refreshApplyButton();
+
+      function refreshApplyButton() {
+        var btn = document.getElementById("apply-parsed");
+        if (!btn) return;
+        var blocked = res.days.some(function (d) { return d.day === null; });
+        btn.disabled = blocked;
+        btn.textContent = blocked ? "Сначала выбери день" : "Записать в дневник";
+      }
+    });
+  }
+
+  function unparsedBox(unparsed) {
+    var box = el("div", "sheet-item unparsed");
+    box.appendChild(el("div", "unparsed-head",
+      "Не поняла " + unparsed.length + " " + D.plural(unparsed.length, "строку", "строки", "строк") + ":"));
+    unparsed.slice(0, 8).forEach(function (u) {
+      box.appendChild(el("div", "unparsed-line", u.raw.trim().slice(0, 90)));
+    });
+    if (unparsed.length > 8) {
+      box.appendChild(el("div", "unparsed-line", "…и ещё " + (unparsed.length - 8)));
+    }
+    return box;
+  }
+
+  /* Разобранное записывается в РАСПИСАНИЕ, а не в отметки: меняются
+     дни и уроки, а всё, что уже вписано в клетки, остаётся. */
+  function applyParsed(res) {
+    var ops = [];
+    var added = 0;
+
+    res.days.forEach(function (pd) {
+      if (pd.day === null) return;
+      var dayIdx = pd.day;
+      if (dayIdx >= doc.template.days.length) return;
+      var day = doc.template.days[dayIdx];
+
+      if (!day.on) ops.push({ path: ["template", "days", dayIdx, "on"], value: true });
+
+      pd.lessons.forEach(function (les, i) {
+        var sid = null;
+        var name = String(les.subject || "").trim();
+        if (name) {
+          var found = null;
+          Object.keys(doc.subjects).forEach(function (id) {
+            if (doc.subjects[id].name.toLowerCase() === name.toLowerCase()) found = id;
+          });
+          if (found) sid = found;
+          else {
+            sid = D.newId();
+            ops.push({ path: ["subjects", sid], value: { id: sid, name: name } });
+          }
+        }
+        if (i < day.slots.length) {
+          ops.push({ path: ["template", "days", dayIdx, "slots", i, "subjectId"], value: sid });
+        } else {
+          ops.push({ path: ["template", "days", dayIdx, "slots", i],
+                     insert: { id: D.newId(), subjectId: sid } });
+        }
+        added++;
+
+        // кабинет попадает в графу «Кабинет», если она есть на развороте
+        if (les.room) {
+          var hasRoom = (doc.template.columns || []).some(function (c) {
+            return c.id === "room" && c.on !== false;
+          });
+          if (hasRoom) {
+            var slotId = i < day.slots.length ? day.slots[i].id : null;
+            if (slotId) {
+              if (!doc.weeks[weekId]) {
+                ops.push({ path: ["weeks", weekId], value: { cells: {}, struck: {} } });
+              }
+              ops.push({ path: ["weeks", weekId, "cells", D.cellKey(day.id, slotId, "room")],
+                         value: { v: les.room, t: Date.now(), c: (doc.clock || 0) + 1 } });
+            }
+          }
+        }
+      });
+    });
+
+    if (!ops.length) return;
+    change(ops, "Расписание записано: " + added + " " + D.plural(added, "урок", "урока", "уроков"));
+  }
+
   /* ---------- печать ----------
      Для ретро-дневника печать не побочная функция. Формат
      подставляется по стране, но переключается: у человека в США дома
@@ -1092,6 +1297,7 @@
     $("#b-open").addEventListener("click", openFromFile);
     $("#b-look").addEventListener("click", openLookSheet);
     $("#b-preset").addEventListener("click", openPresetSheet);
+    $("#b-paste").addEventListener("click", openPasteSheet);
 
     // половины разворота на узком экране
     var spread = $("#spread");

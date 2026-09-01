@@ -1,9 +1,9 @@
 /* Дневник работает без сети: оболочка кладётся в кеш при установке,
    шрифты — по мере загрузки. Версию поднимать при каждом изменении
    index.html, иначе у установленных копий останется старая. */
-const VERSION = "dnevnik-v3";
+const VERSION = "dnevnik-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-maskable.svg",
-  "./style/paper.css", "./core/core.js", "./ui/app.js",
+  "./style/paper.css", "./core/core.js", "./core/parse.js", "./ui/app.js",
   "./fonts/pt-sans-narrow-400-cyrillic.woff2", "./fonts/pt-sans-narrow-700-cyrillic.woff2",
   "./fonts/pt-serif-400-cyrillic.woff2", "./fonts/pt-serif-700-cyrillic.woff2",
   "./fonts/caveat-cyrillic.woff2"];
