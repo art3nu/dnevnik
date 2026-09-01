@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дневник ученика</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#6E4232">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Дневник">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Caveat:wght@400;600;700&display=swap">
+<style>
+/* ============ ТОКЕНЫ ============ */
+:root{
+  --desk:#B9AE93;
+  --paper:#E9E3D0; --paper-edge:#DCD4BC; --paper-deep:#DFD8C1;
+  --rule:#A9B0BC; --rule-soft:#C3C8D1;
+  --ink:#2F3C57; --ink-soft:#6B7691; --ink-faint:#98A0B2;
+  --hand:#26348C; --red:#A33327; --red-soft:#C4695C;
+  --cover:#6E4232; --cover-2:#5A3427; --gold:#B08A4A;
+  --ok:#3E6B4A; --warn:#8A6A22;
+  --shadow:rgba(58,44,26,.22);
+  --f-narrow:"PT Sans Narrow","Arial Narrow",system-ui,sans-serif;
+  --f-serif:"PT Serif",Georgia,serif;
+  --f-hand:"Caveat","Segoe Script",cursive;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --desk:#100E0B;
+    --paper:#241F17; --paper-edge:#2E2820; --paper-deep:#2A241B;
+    --rule:#4A4638; --rule-soft:#3A3629;
+    --ink:#CFC7AC; --ink-soft:#9A9280; --ink-faint:#6E6857;
+    --hand:#9DB3E8; --red:#D9705F; --red-soft:#A85748;
+    --cover:#3A241C; --cover-2:#2A1912; --gold:#C9A566;
+    --ok:#7FB48C; --warn:#D0AC5E;
+    --shadow:rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --desk:#100E0B;
+  --paper:#241F17; --paper-edge:#2E2820; --paper-deep:#2A241B;
+  --rule:#4A4638; --rule-soft:#3A3629;
+  --ink:#CFC7AC; --ink-soft:#9A9280; --ink-faint:#6E6857;
+  --hand:#9DB3E8; --red:#D9705F; --red-soft:#A85748;
+  --cover:#3A241C; --cover-2:#2A1912; --gold:#C9A566;
+  --ok:#7FB48C; --warn:#D0AC5E;
+  --shadow:rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--desk);
+  background-image:repeating-linear-gradient(92deg,transparent 0 38px,rgba(0,0,0,.035) 38px 39px);
+  color:var(--ink); font-family:var(--f-serif); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--red); outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 72px}
+
+/* ============ ОБЛОЖКА ============ */
+.cover{
+  background:linear-gradient(160deg,var(--cover),var(--cover-2));
+  background-image:
+    linear-gradient(160deg,rgba(255,255,255,.05),rgba(0,0,0,.25)),
+    repeating-linear-gradient(45deg,rgba(0,0,0,.05) 0 2px,transparent 2px 4px),
+    repeating-linear-gradient(-45deg,rgba(255,255,255,.03) 0 2px,transparent 2px 4px);
+  border-radius:3px 8px 8px 3px; padding:34px 30px 30px;
+  box-shadow:0 10px 26px var(--shadow), inset 0 0 0 1px rgba(0,0,0,.35);
+  position:relative; overflow:hidden;
+}
+.cover::before{content:"";position:absolute;inset:0 auto 0 0;width:16px;
+  background:linear-gradient(90deg,rgba(0,0,0,.4),rgba(0,0,0,0))}
+.emboss{
+  font-family:var(--f-narrow); text-transform:uppercase; color:var(--gold);
+  text-shadow:0 1px 0 rgba(0,0,0,.55), 0 -1px 0 rgba(255,255,255,.14);
+}
+.cover h1{margin:0;font-size:clamp(34px,7vw,60px);letter-spacing:.32em;font-weight:700}
+.cover .sub{font-size:13px;letter-spacing:.34em;margin-top:8px;opacity:.78}
+.cover .frame{border-top:2px double var(--gold);opacity:.5;margin:18px 0}
+.coverfields{display:grid;gap:12px;margin-top:22px;max-width:580px}
+.cf{display:grid;grid-template-columns:158px 1fr;gap:10px;align-items:baseline}
+.cf > span{font-family:var(--f-narrow);font-size:12px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--gold);opacity:.85}
+.cf .fill{
+  border-bottom:1px solid rgba(255,255,255,.32); min-height:27px; padding:0 4px 2px;
+  font-family:var(--f-hand); font-size:23px; color:#F0E6D2; line-height:1.15; outline:none;
+}
+.cf .fill:focus{background:rgba(255,255,255,.07)}
+
+/* ============ ЗАКЛАДКИ ============ */
+.tabs{display:flex;gap:5px;margin:18px 0 0;flex-wrap:wrap;position:relative;z-index:2}
+.tab{
+  font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.13em;font-size:13px;
+  background:var(--paper-edge); color:var(--ink-soft); border:1px solid var(--rule-soft);
+  border-bottom:none; border-radius:5px 5px 0 0; padding:9px 15px 8px; cursor:pointer;
+  box-shadow:0 -2px 6px var(--shadow);
+}
+.tab[aria-selected="true"]{background:var(--paper);color:var(--ink);font-weight:700}
+
+/* ============ СТРАНИЦА ============ */
+.page{
+  background:var(--paper); border:1px solid var(--rule-soft); border-radius:0 4px 4px 0;
+  box-shadow:0 8px 22px var(--shadow); padding:26px 24px 30px; position:relative;
+}
+.page[hidden]{display:none}
+.pagehead{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;
+  justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.pagehead h2{font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.2em;
+  font-size:19px;margin:0;font-weight:700}
+.pagehead .meta{font-family:var(--f-narrow);font-size:13px;letter-spacing:.08em;color:var(--ink-soft)}
+.intro{font-size:14.5px;color:var(--ink-soft);max-width:66ch;margin:14px 0 0}
+
+/* ============ РАЗВОРОТ ============ */
+.spread{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:18px;position:relative}
+.spread::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:26px;
+  transform:translateX(-50%);
+  background:linear-gradient(90deg,rgba(0,0,0,0),var(--shadow),rgba(0,0,0,0));
+  pointer-events:none;opacity:.45}
+.leaf{padding:0 22px}
+.leaf:first-child{border-right:1px solid var(--rule-soft)}
+@media (max-width:900px){
+  .spread{grid-template-columns:1fr}
+  .spread::before{display:none}
+  .leaf{padding:0}
+  .leaf:first-child{border-right:none}
+}
+
+/* ============ ДЕНЬ ============ */
+.day{margin:0 0 26px}
+.dayhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  border-bottom:1px solid var(--ink);padding-bottom:3px;margin-bottom:2px}
+.dayname{font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.22em;
+  font-size:15px;font-weight:700}
+.daydate{font-family:var(--f-narrow);font-size:13px;color:var(--ink-soft);letter-spacing:.06em}
+.daynote{font-family:var(--f-hand);font-size:19px;color:var(--red);margin:5px 0 6px;line-height:1.2}
+
+table.grid{width:100%;border-collapse:collapse;table-layout:fixed}
+table.grid th{
+  font-family:var(--f-narrow);font-weight:400;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.11em;color:var(--ink-soft);text-align:left;padding:4px 5px;
+  border-bottom:1px solid var(--rule);
+}
+table.grid td{border-bottom:1px solid var(--rule-soft);padding:5px;vertical-align:top}
+.c-n{width:22px;text-align:center;font-family:var(--f-narrow);font-size:12px;color:var(--ink-faint)}
+.c-subj{width:30%}
+.c-mark{width:42px;text-align:center}
+.c-sign{width:52px;text-align:center}
+.subj{font-family:var(--f-narrow);font-size:14px;font-weight:700;letter-spacing:.03em;line-height:1.2}
+.time{font-family:var(--f-narrow);font-size:10.5px;color:var(--ink-faint);letter-spacing:.05em}
+.task{font-family:var(--f-hand);font-size:19.5px;line-height:1.24;color:var(--hand);
+  min-height:24px;outline:none;padding:1px 2px;border-radius:2px}
+.task:focus{background:rgba(38,52,140,.09)}
+.tag{font-family:var(--f-narrow);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--red);display:block;opacity:.9;margin-top:2px}
+
+.mark{
+  font-family:var(--f-hand);font-size:29px;font-weight:700;color:var(--red);
+  background:none;border:none;cursor:pointer;width:100%;line-height:1;padding:0;
+  transform:rotate(-7deg);transition:transform .12s ease;
+}
+.mark:hover{transform:rotate(-7deg) scale(1.14)}
+.mark.empty{color:var(--rule);font-size:20px;transform:none;opacity:.5}
+.mark.empty:hover{opacity:1;transform:none}
+
+.done{
+  background:none;border:none;cursor:pointer;font-family:var(--f-hand);font-size:26px;
+  color:var(--red);line-height:1;padding:0;width:100%;transform:rotate(-11deg);
+}
+.done.off{color:var(--rule);opacity:.4;transform:none;font-size:19px}
+.done.off:hover{opacity:.85}
+
+/* ============ ПОДВАЛ ============ */
+.footline{margin-top:10px;border-top:2px solid var(--ink);padding-top:14px;
+  display:grid;grid-template-columns:1fr 250px;gap:24px}
+@media (max-width:760px){.footline{grid-template-columns:1fr}}
+.lbl{font-family:var(--f-narrow);font-size:11px;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-soft);display:block;margin-bottom:6px}
+.writein{
+  font-family:var(--f-hand);font-size:20px;color:var(--hand);line-height:26px;
+  min-height:78px;padding:0 5px;outline:none;border-radius:2px;
+  background-image:repeating-linear-gradient(transparent 0 25px,var(--rule-soft) 25px 26px);
+}
+.writein:focus{background-color:rgba(38,52,140,.06)}
+.sigbox{border-bottom:1px solid var(--rule);min-height:46px;font-family:var(--f-hand);
+  font-size:22px;color:var(--hand);padding:2px 4px;outline:none}
+
+/* ============ СВОДКА ============ */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0 4px}
+.stat{border:1px solid var(--rule);background:var(--paper-deep);padding:11px 13px;border-radius:2px}
+.stat .k{font-family:var(--f-narrow);font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.13em;color:var(--ink-soft);display:block}
+.stat .v{font-family:var(--f-narrow);font-size:29px;font-weight:700;line-height:1.15;
+  font-variant-numeric:tabular-nums;display:block;margin-top:2px}
+.stat .v.good{color:var(--ok)} .stat .v.warn{color:var(--warn)} .stat .v.bad{color:var(--red)}
+.stat .h{font-family:var(--f-serif);font-size:12px;color:var(--ink-faint);font-style:italic}
+
+/* ============ СЕТКА РАСПИСАНИЯ ============ */
+.wrapx{overflow-x:auto}
+.tt{width:100%;border-collapse:collapse;margin-top:16px;min-width:720px}
+.tt th,.tt td{border:1px solid var(--rule);padding:7px 8px;vertical-align:top}
+.tt thead th{background:var(--paper-deep);font-family:var(--f-narrow);font-size:11px;
+  text-transform:uppercase;letter-spacing:.13em;font-weight:700;text-align:center}
+.tt tbody th{width:88px;text-align:center;font-family:var(--f-narrow);font-size:11px;
+  color:var(--ink-soft);font-weight:400;background:var(--paper-deep)}
+.tt td{font-family:var(--f-narrow);font-size:13px;font-weight:700;line-height:1.25}
+.tt td em{display:block;font-family:var(--f-serif);font-style:italic;font-weight:400;
+  font-size:11.5px;color:var(--ink-soft);margin-top:2px}
+.tt tr.brk td{background:var(--paper-deep);font-weight:400;font-style:italic;
+  font-family:var(--f-serif);font-size:12.5px;color:var(--ink-soft);text-align:center}
+
+/* ============ ПОВЕДЕНИЕ ============ */
+.habits{width:100%;border-collapse:collapse;margin-top:14px;min-width:660px}
+.habits th,.habits td{border:1px solid var(--rule);padding:6px}
+.habits thead th{background:var(--paper-deep);font-family:var(--f-narrow);font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;text-align:center}
+.habits tbody th{text-align:left;font-family:var(--f-narrow);font-size:13px;font-weight:700;
+  min-width:160px}
+.habits tbody th em{display:block;font-family:var(--f-serif);font-weight:400;font-style:italic;
+  font-size:11.5px;color:var(--ink-faint)}
+.habits td{text-align:center;padding:2px}
+.hb{background:none;border:none;cursor:pointer;font-family:var(--f-hand);font-size:25px;
+  line-height:1.3;width:100%;color:var(--red);transform:rotate(-9deg);padding:2px 0}
+.hb.off{color:var(--rule);opacity:.32;transform:none;font-size:18px}
+.hb.off:hover{opacity:.8}
+.hb.miss{color:var(--ink-faint);opacity:.85;transform:none;font-size:22px}
+
+.streak{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.chip{border:1px solid var(--rule);background:var(--paper-deep);border-radius:2px;
+  padding:9px 14px;display:flex;gap:10px;align-items:baseline}
+.chip b{font-family:var(--f-narrow);font-size:26px;font-variant-numeric:tabular-nums}
+.chip span{font-family:var(--f-narrow);font-size:11px;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--ink-soft)}
+
+/* ============ КНОПКИ ============ */
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px;padding-top:16px;
+  border-top:1px solid var(--rule-soft)}
+.btn{font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.13em;font-size:12px;
+  background:var(--paper-deep);border:1px solid var(--rule);color:var(--ink);
+  padding:8px 14px;border-radius:2px;cursor:pointer}
+.btn:hover{background:var(--paper-edge);border-color:var(--ink-soft)}
+.btn.warn{color:var(--red);border-color:var(--red-soft)}
+.hint{font-size:12.5px;color:var(--ink-faint);font-style:italic;margin-top:12px;max-width:68ch}
+
+.stamp{
+  position:absolute;right:22px;top:18px;transform:rotate(-13deg);
+  border:2.5px solid var(--red);color:var(--red);border-radius:4px;
+  font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.16em;
+  font-size:11px;padding:6px 12px;opacity:.7;line-height:1.3;text-align:center;
+  pointer-events:none;
+}
+.stamp b{display:block;font-size:15px;letter-spacing:.09em}
+@media (max-width:760px){.stamp{display:none}}
+
+/* подсказки в пустых клетках */
+[contenteditable][data-ph]:empty::before{
+  content:attr(data-ph); color:var(--ink-faint); opacity:.55; font-style:italic;
+  font-family:var(--f-serif); font-size:13px; pointer-events:none;
+}
+.cf .fill[data-ph]:empty::before{color:#F0E6D2;opacity:.35;font-size:14px}
+
+.rules{margin:14px 0 0;padding-left:20px;max-width:66ch}
+.rules li{margin-bottom:7px;font-size:14.5px}
+.rules b{font-family:var(--f-narrow);letter-spacing:.02em}
+
+/* ============ ПЕЧАТЬ ============ */
+@media print{
+  body{background:#fff;color:#000}
+  .tabs,.bar,.hint,.stamp{display:none!important}
+  .page,.cover{box-shadow:none}
+  .page{border:none;padding:0;background:#fff}
+  .page[hidden]{display:block!important;break-before:page}
+  .wrap{max-width:none;padding:0}
+  .day{break-inside:avoid}
+  .tt,.habits{min-width:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ================= ОБЛОЖКА ================= -->
+<div class="cover">
+  <h1 class="emboss">Дневник</h1>
+  <div class="sub emboss">Учебный год 2026/27</div>
+  <div class="frame"></div>
+  <div class="coverfields">
+    <label class="cf"><span>Фамилия, имя</span><div class="fill" contenteditable="true" data-meta="owner" data-ph="впиши себя"></div></label>
+    <label class="cf"><span>Класс</span><div class="fill" contenteditable="true" data-meta="grade" data-ph="первый год"></div></label>
+    <label class="cf"><span>Школа</span><div class="fill" contenteditable="true" data-meta="school" data-ph="школа своя"></div></label>
+    <label class="cf"><span>Классный руководитель</span><div class="fill" contenteditable="true" data-meta="teacher" data-ph="сам себе"></div></label>
+  </div>
+</div>
+
+<!-- ================= ЗАКЛАДКИ ================= -->
+<div class="tabs" role="tablist" aria-label="Разделы дневника">
+  <button class="tab" role="tab" id="tab-week" aria-controls="p-week" aria-selected="true">Неделя I</button>
+  <button class="tab" role="tab" id="tab-tt" aria-controls="p-tt" aria-selected="false">Расписание</button>
+  <button class="tab" role="tab" id="tab-hab" aria-controls="p-hab" aria-selected="false">Поведение</button>
+  <button class="tab" role="tab" id="tab-sum" aria-controls="p-sum" aria-selected="false">Итоги</button>
+  <button class="tab" role="tab" id="tab-help" aria-controls="p-help" aria-selected="false">Правила</button>
+</div>
+
+<!-- ================= НЕДЕЛЯ ================= -->
+<section class="page" id="p-week" role="tabpanel" aria-labelledby="tab-week">
+  <div class="stamp"><b>Неделя I</b>к работе допущен</div>
+  <div class="pagehead">
+    <h2>Неделя первая</h2>
+    <div class="meta" id="week-dates">31 августа — 5 сентября 2026</div>
+  </div>
+  <div class="spread">
+    <div class="leaf" id="leaf-a"></div>
+    <div class="leaf" id="leaf-b"></div>
+  </div>
+  <div class="footline">
+    <div>
+      <span class="lbl">Замечания и записи за неделю</span>
+      <div class="writein" contenteditable="true" data-meta="remarks" data-ph="три строки в субботу: что вышло, что нет, из-за чего"></div>
+    </div>
+    <div>
+      <span class="lbl">Подпись за неделю</span>
+      <div class="sigbox" contenteditable="true" data-meta="signature" data-ph="подпись"></div>
+      <p class="hint" style="margin-top:8px">Подписывать в субботу, после того как выставлены отметки.</p>
+    </div>
+  </div>
+  <div class="bar">
+    <button class="btn" id="b-print">Печать</button>
+    <button class="btn" id="b-export">Сохранить в файл</button>
+    <button class="btn" id="b-import">Загрузить из файла</button>
+    <button class="btn" id="b-next">Новая неделя</button>
+    <button class="btn warn" id="b-reset">Очистить всё</button>
+  </div>
+  <p class="hint">Задания и предметы редактируются прямо в клетке — нажми и пиши. Отметка ставится щелчком по клетке «отм.»: 5 → 4 → 3 → 2 → н/а → пусто. Всё сохраняется в браузере само.</p>
+</section>
+
+<!-- ================= РАСПИСАНИЕ ================= -->
+<section class="page" id="p-tt" role="tabpanel" aria-labelledby="tab-tt" hidden>
+  <div class="pagehead">
+    <h2>Расписание уроков и звонков</h2>
+    <div class="meta">Шестидневка · 1—5 урок</div>
+  </div>
+  <p class="intro">Большая перемена — не «отдохнуть за компьютером». Это выход из дома на воздух: тридцать минут, ноги и небо. В первую неделю она стоит в расписании ровно на месте того, что раньше занимал перекур.</p>
+  <div class="wrapx"><table class="tt" id="tt-grid"></table></div>
+  <p class="hint">Сетка собирается из недели автоматически. Меняешь предмет в дне — меняется и здесь.</p>
+</section>
+
+<!-- ================= ПОВЕДЕНИЕ ================= -->
+<section class="page" id="p-hab" role="tabpanel" aria-labelledby="tab-hab" hidden>
+  <div class="pagehead">
+    <h2>Сведения о поведении</h2>
+    <div class="meta">Отмечать вечером, честно</div>
+  </div>
+  <p class="intro">В старом дневнике эта графа была про дисциплину на уроке. Здесь — про то, из-за чего затевалась вся неделя. Щелчок по клетке: пусто → выполнено → сорвалось. Незаполненная клетка — это не «плохо», это «день ещё не кончился».</p>
+  <div class="wrapx"><table class="habits" id="hab-grid"></table></div>
+  <div class="streak" id="streaks"></div>
+  <div style="margin-top:22px">
+    <span class="lbl">Зачем я это делаю — одной строкой</span>
+    <div class="writein" contenteditable="true" data-meta="why" data-ph="одна строка, без пафоса" style="min-height:52px"></div>
+    <p class="hint">Это единственная строка в дневнике, которую нужно перечитывать на третий день. Третий день — самый тяжёлый.</p>
+  </div>
+</section>
+
+<!-- ================= ИТОГИ ================= -->
+<section class="page" id="p-sum" role="tabpanel" aria-labelledby="tab-sum" hidden>
+  <div class="pagehead">
+    <h2>Сведения об успеваемости</h2>
+    <div class="meta" id="sum-dates">за неделю I</div>
+  </div>
+  <div class="summary" id="sum-stats"></div>
+  <h3 style="font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.18em;font-size:14px;margin:26px 0 0">По предметам</h3>
+  <div class="wrapx"><table class="tt" id="sum-subj" style="min-width:520px"></table></div>
+  <div class="footline" style="margin-top:24px">
+    <div>
+      <span class="lbl">Что перенести на следующую неделю</span>
+      <div class="writein" contenteditable="true" data-meta="carry" data-ph="хвосты, которые тащатся вторую неделю"></div>
+    </div>
+    <div>
+      <span class="lbl">Подпись</span>
+      <div class="sigbox" contenteditable="true" data-meta="signature2" data-ph="подпись"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ПРАВИЛА ================= -->
+<section class="page" id="p-help" role="tabpanel" aria-labelledby="tab-help" hidden>
+  <div class="pagehead">
+    <h2>Правила ведения дневника</h2>
+    <div class="meta">Прочесть один раз</div>
+  </div>
+  <ol class="rules">
+    <li><b>Один разворот — одна неделя.</b> Слева понедельник, вторник, среда. Справа четверг, пятница, суббота. Воскресенья в дневнике нет и не должно быть: выходной не планируют.</li>
+    <li><b>Задание пишется вечером накануне,</b> а не утром того дня. Утром уже поздно решать, чем заниматься.</li>
+    <li><b>Отметка ставится в тот же день.</b> Не назавтра и не «в конце недели разберусь». Отметка за невыполненное — двойка, а не пустая клетка. Пустая клетка — это когда день ещё идёт.</li>
+    <li><b>Пять — это сделано и отгружено наружу.</b> Четыре — сделано, но лежит у тебя. Три — начато. Два — не тронуто. Черновик в папке никогда не пятёрка.</li>
+    <li><b>Графа «Поведение» весит больше отметок.</b> Неделя с четырьмя тройками и шестью чистыми днями лучше недели с пятёрками и срывом.</li>
+    <li><b>Замечания пишутся своей рукой.</b> Один раз в субботу, три строки: что вышло, что нет, из-за чего.</li>
+    <li><b>Дневник не переписывают набело.</b> Зачёркнутое остаётся зачёркнутым — по нему потом и видно, что происходило.</li>
+  </ol>
+  <h3 style="font-family:var(--f-narrow);text-transform:uppercase;letter-spacing:.18em;font-size:14px;margin:28px 0 0">Расписание звонков</h3>
+  <div class="wrapx"><table class="tt" id="bells" style="min-width:420px"></table></div>
+  <div class="bar">
+    <button class="btn" id="b-print2">Печать дневника</button>
+  </div>
+  <p class="hint">Печатает все разделы подряд — обложку, неделю, расписание, поведение и итоги. Формат страницы — альбомный A4, тогда разворот встаёт как в книге.</p>
+</section>
+
+</div><!-- /wrap -->
+
+<script src="personal/my-week.js" onerror="void 0"></script>
+<script>
+(function(){
+"use strict";
+
+/* ================= ДЕМО-НЕДЕЛЯ (шаблон репозитория) ================= */
+/* Своя неделя кладётся в personal/my-week.js:  window.MY_WEEK = {...}  */
+var DEMO_WEEK = {
+  weekNo: "I",
+  dates: "31 августа — 5 сентября 2026",
+  bells: [
+    ["1 урок","09:00 — 09:45"],
+    ["перемена","09:45 — 09:55"],
+    ["2 урок","09:55 — 10:40"],
+    ["большая перемена","10:40 — 11:10 · улица, 30 минут"],
+    ["3 урок","11:10 — 11:55"],
+    ["перемена","11:55 — 12:05"],
+    ["4 урок","12:05 — 12:50"],
+    ["перемена","12:50 — 13:00"],
+    ["5 урок","13:00 — 13:45"]
+  ],
+  habits: [
+    {name:"Без сигарет",       note:"главная графа недели"},
+    {name:"Без пива",          note:"вместе с первой, иначе не держится"},
+    {name:"Улица, 30 минут",   note:"на большой перемене"},
+    {name:"Отбой до 23:00",    note:"недосып возвращает тягу"},
+    {name:"Три литра воды",    note:"мера, а не ощущение"}
+  ],
+  days: [
+    {name:"Понедельник", date:"31 августа", note:"Первый день. Отсюда считается всё остальное.", lessons:[
+      {subj:"Физкультура", task:"Вынести из дома всё курительное и пиво. Не спрятать, не «на потом» — вынести.", tag:"начало"},
+      {subj:"История",     task:"Завести дневник. Вписать себя на обложке и одну строку «зачем» в разделе поведения."},
+      {subj:"Арифметика",  task:"Проверить цифры за прошлый месяц: расход против чистой выручки. Одна страница."},
+      {subj:"Физкультура", task:"Прогулка сорок минут. Отбой до 23:00 — первая ночь самая тяжёлая.", tag:"вечер"}
+    ]},
+    {name:"Вторник", date:"1 сентября", note:"Первое сентября. Начинать так начинать.", lessons:[
+      {subj:"Правоведение", task:"Самое отложенное дело с юридическим сроком. Разобраться и сделать первый шаг."},
+      {subj:"Арифметика",   task:"Реклама: посмотреть свежую неделю, не месячное среднее. Одно решение по ставке."},
+      {subj:"Русский язык", task:"Переписать одно место в описании товара, из-за которого приходят возвраты."},
+      {subj:"Физкультура",  task:"Улица вместо пяти перекуров. Считать не сигареты, а выходы.", tag:"день 2"}
+    ]},
+    {name:"Среда", date:"2 сентября", note:"Третий день. Сегодня тянет сильнее всего — это нормально и это проходит.", lessons:[
+      {subj:"Русский язык", task:"Ответ на самый частый вопрос покупателя — вынести прямо в карточку."},
+      {subj:"Информатика",  task:"Проверить, что автоматика действительно работает: смотреть на результат, не на статус."},
+      {subj:"Труд",         task:"Один готовый материал довести до публикации. Не начинать новый."},
+      {subj:"Физкультура",  task:"Холодный душ и двадцать отжиманий на каждом приступе тяги.", tag:"день 3"}
+    ]},
+    {name:"Четверг", date:"3 сентября", note:"Контрольная: проверяем то, что меняли в прошлый раз.", lessons:[
+      {subj:"Арифметика",  task:"Контрольная. Тянуть отчёт по изменению, сделанному неделю назад. Не угадывать.", tag:"контрольная"},
+      {subj:"Арифметика",  task:"Решение по расходу: что гасим, что оставляем. Записать причину."},
+      {subj:"Труд",        task:"Закрыть последнюю незакрытую ячейку в трекере отгрузки."},
+      {subj:"Физкультура", task:"Прогулка. Отбой до 23:00.", tag:"день 4"}
+    ]},
+    {name:"Пятница", date:"4 сентября", note:"", lessons:[
+      {subj:"Информатика",  task:"Отключить то, за что платится впустую. Строго по порядку: сначала перенести, потом отменять."},
+      {subj:"Черчение",     task:"План на первые отзывы: вкладыш, письмо, срок."},
+      {subj:"Труд",         task:"Перевыложить то, что уже сделано, но никем не увидено."},
+      {subj:"Физкультура",  task:"Улица. Пятый день — уже видно, что держится.", tag:"день 5"}
+    ]},
+    {name:"Суббота", date:"5 сентября", note:"Короткий день. Разбор недели.", lessons:[
+      {subj:"История",     task:"Разбор недели: что ушло наружу, что застряло. Читать трекер, а не память.", tag:"разбор"},
+      {subj:"Информатика", task:"Одно откладываемое техническое дело — сделать целиком."},
+      {subj:"История",     task:"Выставить отметки за неделю честно. Подписать разворот."},
+      {subj:"Физкультура", task:"Награда за шесть чистых дней. Не сигарета и не пиво — что-нибудь другое.", tag:"итог"}
+    ]}
+  ]
+};
+
+/* ================= СОСТОЯНИЕ ================= */
+var KEY = "dnevnik.v1";
+var MARKS = [null, 5, 4, 3, 2, "н"];
+var state = null;
+
+function blankWeek(src){
+  var w = JSON.parse(JSON.stringify(src));
+  w.days.forEach(function(d){
+    d.lessons.forEach(function(l){ l.mark = null; l.done = false; l.sign = ""; });
+    d.habits = {};
+  });
+  return w;
+}
+function defaults(){
+  var src = (typeof window !== "undefined" && window.MY_WEEK) ? window.MY_WEEK : DEMO_WEEK;
+  return {
+    meta:{owner:"",grade:"",school:"",teacher:"",remarks:"",signature:"",why:"",carry:"",signature2:""},
+    week: blankWeek(src),
+    archive: []
+  };
+}
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return defaults();
+    var s = JSON.parse(raw);
+    if(!s || !s.week || !s.week.days) return defaults();
+    if(!s.meta) s.meta = defaults().meta;
+    if(!s.archive) s.archive = [];
+    return s;
+  }catch(e){ return defaults(); }
+}
+var saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+  }, 200);
+}
+
+/* ================= УТИЛИТЫ ================= */
+function el(tag, cls, txt){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(txt != null) n.textContent = txt;
+  return n;
+}
+function markLabel(m){ return m === null || m === undefined ? "·" : String(m); }
+function plural(n, one, few, many){
+  var a = Math.abs(n) % 100, b = a % 10;
+  if(a > 10 && a < 20) return many;
+  if(b > 1 && b < 5) return few;
+  if(b === 1) return one;
+  return many;
+}
+
+/* ================= НЕДЕЛЯ ================= */
+function renderWeek(){
+  var a = document.getElementById("leaf-a");
+  var b = document.getElementById("leaf-b");
+  a.innerHTML = ""; b.innerHTML = "";
+  document.getElementById("week-dates").textContent = state.week.dates;
+  document.getElementById("sum-dates").textContent = "за неделю " + state.week.weekNo;
+  document.querySelector("#tab-week").textContent = "Неделя " + state.week.weekNo;
+
+  state.week.days.forEach(function(day, di){
+    (di < 3 ? a : b).appendChild(dayNode(day, di));
+  });
+}
+
+function dayNode(day, di){
+  var wrap = el("section","day");
+
+  var head = el("div","dayhead");
+  var nm = el("div","dayname"); nm.contentEditable = "true"; nm.textContent = day.name;
+  nm.addEventListener("input", function(){ day.name = nm.textContent.trim(); save(); });
+  var dt = el("div","daydate"); dt.contentEditable = "true"; dt.textContent = day.date;
+  dt.addEventListener("input", function(){ day.date = dt.textContent.trim(); save(); });
+  head.appendChild(nm); head.appendChild(dt);
+  wrap.appendChild(head);
+
+  var note = el("div","daynote"); note.contentEditable = "true"; note.textContent = day.note || "";
+  note.setAttribute("data-ph","чем этот день отличается");
+  note.addEventListener("input", function(){ day.note = note.textContent.trim(); save(); });
+  wrap.appendChild(note);
+
+  var tbl = el("table","grid");
+  var thead = el("thead");
+  var hr = el("tr");
+  [["","c-n"],["Предмет","c-subj"],["Что задано",""],["Отм.","c-mark"],["Сдал","c-sign"]].forEach(function(h){
+    var th = el("th", h[1], h[0]); hr.appendChild(th);
+  });
+  thead.appendChild(hr); tbl.appendChild(thead);
+
+  var tb = el("tbody");
+  day.lessons.forEach(function(les, li){
+    tb.appendChild(lessonRow(day, les, li));
+  });
+  tbl.appendChild(tb);
+  wrap.appendChild(tbl);
+
+  var add = el("button","btn","+ урок");
+  add.style.cssText = "margin-top:6px;padding:4px 10px;font-size:11px";
+  add.addEventListener("click", function(){
+    day.lessons.push({subj:"Предмет", task:"", mark:null, done:false});
+    save(); renderAll();
+  });
+  wrap.appendChild(add);
+  return wrap;
+}
+
+function lessonRow(day, les, li){
+  var tr = el("tr");
+
+  var n = el("td","c-n", String(li+1));
+  tr.appendChild(n);
+
+  var tdS = el("td","c-subj");
+  var s = el("div","subj"); s.contentEditable = "true"; s.textContent = les.subj; s.setAttribute("data-ph","предмет");
+  s.addEventListener("input", function(){ les.subj = s.textContent.trim(); save(); });
+  var t = el("div","time", bellFor(li));
+  tdS.appendChild(s); tdS.appendChild(t);
+  tr.appendChild(tdS);
+
+  var tdT = el("td");
+  var task = el("div","task"); task.contentEditable = "true"; task.textContent = les.task || ""; task.setAttribute("data-ph","что задано");
+  task.addEventListener("input", function(){ les.task = task.textContent.trim(); save(); });
+  tdT.appendChild(task);
+  if(les.tag){ tdT.appendChild(el("span","tag", les.tag)); }
+  tr.appendChild(tdT);
+
+  var tdM = el("td","c-mark");
+  var mk = el("button", "mark" + (les.mark == null ? " empty" : ""), markLabel(les.mark));
+  mk.title = "Отметка: 5 → 4 → 3 → 2 → н → пусто";
+  mk.setAttribute("aria-label","Отметка за урок " + (li+1));
+  mk.addEventListener("click", function(){
+    var i = MARKS.indexOf(les.mark === undefined ? null : les.mark);
+    les.mark = MARKS[(i + 1) % MARKS.length];
+    save(); renderAll();
+  });
+  tdM.appendChild(mk);
+  tr.appendChild(tdM);
+
+  var tdD = el("td","c-sign");
+  var dn = el("button","done" + (les.done ? "" : " off"), les.done ? "✓" : "—");
+  dn.title = "Сделано";
+  dn.setAttribute("aria-label","Отметить как сделанное");
+  dn.addEventListener("click", function(){ les.done = !les.done; save(); renderAll(); });
+  tdD.appendChild(dn);
+  tr.appendChild(tdD);
+
+  return tr;
+}
+
+function bellFor(i){
+  var b = state.week.bells || [];
+  var lessons = b.filter(function(r){ return /урок/.test(r[0]); });
+  return lessons[i] ? lessons[i][1] : "";
+}
+
+/* ================= РАСПИСАНИЕ ================= */
+function renderTT(){
+  var t = document.getElementById("tt-grid");
+  t.innerHTML = "";
+  var maxL = 0;
+  state.week.days.forEach(function(d){ if(d.lessons.length > maxL) maxL = d.lessons.length; });
+
+  var thead = el("thead"); var hr = el("tr");
+  hr.appendChild(el("th","","Урок"));
+  state.week.days.forEach(function(d){ hr.appendChild(el("th","", d.name)); });
+  thead.appendChild(hr); t.appendChild(thead);
+
+  var tb = el("tbody");
+  for(var i = 0; i < maxL; i++){
+    var tr = el("tr");
+    var th = el("th");
+    th.appendChild(el("div","", String(i+1)));
+    var bt = el("div","", bellFor(i)); bt.style.cssText = "font-size:10px;opacity:.75";
+    th.appendChild(bt);
+    tr.appendChild(th);
+    state.week.days.forEach(function(d){
+      var les = d.lessons[i];
+      var td = el("td");
+      if(les){
+        td.appendChild(document.createTextNode(les.subj));
+        if(les.task){ td.appendChild(el("em","", les.task)); }
+      } else { td.textContent = "—"; td.style.color = "var(--ink-faint)"; }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+    if(i === 1){
+      var br = el("tr","brk");
+      var bd = el("td","", "большая перемена — улица, 30 минут");
+      bd.colSpan = state.week.days.length + 1;
+      br.appendChild(bd); tb.appendChild(br);
+    }
+  }
+  t.appendChild(tb);
+
+  var bells = document.getElementById("bells");
+  bells.innerHTML = "";
+  var bh = el("thead"); var bhr = el("tr");
+  bhr.appendChild(el("th","","Что")); bhr.appendChild(el("th","","Когда"));
+  bh.appendChild(bhr); bells.appendChild(bh);
+  var bb = el("tbody");
+  (state.week.bells || []).forEach(function(r){
+    var tr = el("tr");
+    if(!/урок/.test(r[0])) tr.className = "brk";
+    var a = el("td","", r[0]); var b2 = el("td","", r[1]);
+    tr.appendChild(a); tr.appendChild(b2); bb.appendChild(tr);
+  });
+  bells.appendChild(bb);
+}
+
+/* ================= ПОВЕДЕНИЕ ================= */
+function renderHabits(){
+  var t = document.getElementById("hab-grid");
+  t.innerHTML = "";
+  var habits = state.week.habits || [];
+
+  var thead = el("thead"); var hr = el("tr");
+  hr.appendChild(el("th","","Показатель"));
+  state.week.days.forEach(function(d){
+    var th = el("th");
+    th.appendChild(document.createTextNode(d.name.slice(0,2).toUpperCase()));
+    var sm = el("div","", d.date.split(" ")[0]);
+    sm.style.cssText = "font-size:10px;font-weight:400;opacity:.7";
+    th.appendChild(sm);
+    hr.appendChild(th);
+  });
+  hr.appendChild(el("th","","Итог"));
+  thead.appendChild(hr); t.appendChild(thead);
+
+  var tb = el("tbody");
+  habits.forEach(function(h, hi){
+    var tr = el("tr");
+    var th = el("th");
+    th.appendChild(document.createTextNode(h.name));
+    if(h.note) th.appendChild(el("em","", h.note));
+    tr.appendChild(th);
+    var good = 0;
+    state.week.days.forEach(function(d, di){
+      if(!d.habits) d.habits = {};
+      var v = d.habits[hi] || 0;
+      if(v === 1) good++;
+      var td = el("td");
+      var cls = v === 1 ? "hb" : (v === 2 ? "hb miss" : "hb off");
+      var txt = v === 1 ? "✓" : (v === 2 ? "✗" : "·");
+      var btn = el("button", cls, txt);
+      btn.setAttribute("aria-label", h.name + ", " + d.name);
+      btn.title = "пусто → выполнено → сорвалось";
+      btn.addEventListener("click", function(){
+        d.habits[hi] = ((d.habits[hi] || 0) + 1) % 3;
+        save(); renderAll();
+      });
+      td.appendChild(btn); tr.appendChild(td);
+    });
+    var tot = el("td");
+    var tv = el("div","", good + " / " + state.week.days.length);
+    tv.style.cssText = "font-family:var(--f-narrow);font-size:14px;font-weight:700;font-variant-numeric:tabular-nums";
+    tot.appendChild(tv); tr.appendChild(tot);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+
+  var box = document.getElementById("streaks");
+  box.innerHTML = "";
+  habits.forEach(function(h, hi){
+    var run = 0;
+    for(var i = 0; i < state.week.days.length; i++){
+      var v = (state.week.days[i].habits || {})[hi] || 0;
+      if(v === 1) run++;
+      else if(v === 2) run = 0;
+      else break;
+    }
+    var c = el("div","chip");
+    var b2 = el("b", "", String(run)); b2.style.color = run > 0 ? "var(--ok)" : "var(--ink-faint)";
+    c.appendChild(b2);
+    c.appendChild(el("span","", plural(run,"день","дня","дней") + " подряд · " + h.name.toLowerCase()));
+    box.appendChild(c);
+  });
+}
+
+/* ================= ИТОГИ ================= */
+function renderSummary(){
+  var marks = [], total = 0, done = 0, twos = 0;
+  var bySubj = {};
+  state.week.days.forEach(function(d){
+    d.lessons.forEach(function(l){
+      total++;
+      if(l.done) done++;
+      if(typeof l.mark === "number"){
+        marks.push(l.mark);
+        if(l.mark === 2) twos++;
+        if(!bySubj[l.subj]) bySubj[l.subj] = [];
+        bySubj[l.subj].push(l.mark);
+      } else if(!bySubj[l.subj]) bySubj[l.subj] = [];
+    });
+  });
+  var avg = marks.length ? (marks.reduce(function(a,b){return a+b;},0) / marks.length) : 0;
+
+  var clean = 0;
+  var habits = state.week.habits || [];
+  state.week.days.forEach(function(d){
+    if(!habits.length) return;
+    var h = d.habits || {};
+    var any = false, bad = false;
+    for(var i = 0; i < habits.length; i++){
+      var v = h[i] || 0;
+      if(v === 1) any = true;
+      if(v === 2) bad = true;
+    }
+    if(any && !bad) clean++;
+  });
+
+  var stats = [
+    {k:"Средний балл", v: marks.length ? avg.toFixed(2) : "—",
+     cls: !marks.length ? "" : (avg >= 4.5 ? "good" : avg >= 3.5 ? "" : avg >= 2.5 ? "warn" : "bad"),
+     h: marks.length + " из " + total + " отметок выставлено"},
+    {k:"Заданий сделано", v: done + " / " + total,
+     cls: total && done === total ? "good" : (done * 2 >= total ? "" : "warn"),
+     h: total ? Math.round(done / total * 100) + " процентов недели" : ""},
+    {k:"Двоек", v: String(twos), cls: twos ? "bad" : "good",
+     h: twos ? "разобрать причину каждой" : "ни одной"},
+    {k:"Чистых дней", v: clean + " / " + state.week.days.length,
+     cls: clean === state.week.days.length && clean ? "good" : (clean ? "" : "warn"),
+     h: "день без единого срыва в поведении"}
+  ];
+
+  var box = document.getElementById("sum-stats");
+  box.innerHTML = "";
+  stats.forEach(function(s){
+    var d = el("div","stat");
+    d.appendChild(el("span","k", s.k));
+    d.appendChild(el("span","v " + (s.cls || ""), s.v));
+    if(s.h) d.appendChild(el("div","h", s.h));
+    box.appendChild(d);
+  });
+
+  var t = document.getElementById("sum-subj");
+  t.innerHTML = "";
+  var thead = el("thead"); var hr = el("tr");
+  ["Предмет","Отметки","Средний"].forEach(function(h){ hr.appendChild(el("th","",h)); });
+  thead.appendChild(hr); t.appendChild(thead);
+  var tb = el("tbody");
+  Object.keys(bySubj).sort().forEach(function(k){
+    var arr = bySubj[k];
+    var tr = el("tr");
+    tr.appendChild(el("td","", k));
+    var td2 = el("td","", arr.length ? arr.join(" · ") : "—");
+    td2.style.fontWeight = "400";
+    tr.appendChild(td2);
+    var a = arr.length ? (arr.reduce(function(x,y){return x+y;},0)/arr.length).toFixed(1) : "—";
+    var td3 = el("td","", a);
+    td3.style.fontVariantNumeric = "tabular-nums";
+    tr.appendChild(td3);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+}
+
+/* ================= META-ПОЛЯ ================= */
+function bindMeta(){
+  var nodes = document.querySelectorAll("[data-meta]");
+  Array.prototype.forEach.call(nodes, function(n){
+    var k = n.getAttribute("data-meta");
+    n.textContent = state.meta[k] || "";
+    n.addEventListener("input", function(){
+      state.meta[k] = n.textContent.trim();
+      save();
+    });
+  });
+}
+
+/* ================= ЗАКЛАДКИ ================= */
+function bindTabs(){
+  var tabs = document.querySelectorAll(".tab");
+  Array.prototype.forEach.call(tabs, function(tab){
+    tab.addEventListener("click", function(){
+      Array.prototype.forEach.call(tabs, function(t){
+        var panel = document.getElementById(t.getAttribute("aria-controls"));
+        var on = t === tab;
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        if(panel) panel.hidden = !on;
+      });
+    });
+  });
+}
+
+/* ================= КНОПКИ ================= */
+/* Сохранение файла. На диске и на GitHub Pages — обычная ссылка.
+   Внутри просмотрщика артефактов ссылки не работают: там файл отдаётся
+   через claude.use("downloads"), и подтверждает его сам зритель. */
+var DL = null;
+if(window.claude && typeof window.claude.use === "function"){
+  try{ window.claude.use("downloads").then(function(ns){ DL = ns; }, function(){}); }catch(e){}
+}
+function download(name, text){
+  if(DL && typeof DL.save === "function"){
+    DL.save({filename:name, data:text}).catch(function(err){
+      var code = err && err.code;
+      if(code === "declined" || code === "rate_limited") return;
+      alert("Сохранить файл не удалось. Дневник цел — он лежит в браузере, попробуй ещё раз или открой его локальной копией.");
+    });
+    return;
+  }
+  var blob = new Blob([text], {type:"application/json;charset=utf-8"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function nextWeek(){
+  var carry = [];
+  state.week.days.forEach(function(d){
+    d.lessons.forEach(function(l){
+      if(l.task && !l.done && l.mark !== 5 && l.mark !== 4){
+        carry.push({subj:l.subj, task:l.task, tag:"хвост"});
+      }
+    });
+  });
+  state.archive.push(state.week);
+  var roman = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"];
+  var idx = roman.indexOf(state.week.weekNo);
+  var nextNo = idx >= 0 && idx < roman.length - 1 ? roman[idx+1] : String(state.archive.length + 1);
+  var src = (window.MY_WEEK || DEMO_WEEK);
+  var w = blankWeek(src);
+  w.weekNo = nextNo;
+  w.dates = "";
+  w.days.forEach(function(d){ d.date = ""; d.note = ""; d.lessons = []; });
+  carry.forEach(function(c, i){
+    var d = w.days[i % w.days.length];
+    d.lessons.push({subj:c.subj, task:c.task, tag:c.tag, mark:null, done:false});
+  });
+  w.days.forEach(function(d){
+    if(!d.lessons.length) d.lessons.push({subj:"Предмет", task:"", mark:null, done:false});
+  });
+  state.week = w;
+  state.meta.remarks = ""; state.meta.signature = ""; state.meta.signature2 = "";
+  save(); renderAll(); bindMeta();
+}
+
+function bindButtons(){
+  document.getElementById("b-print").addEventListener("click", function(){ window.print(); });
+  document.getElementById("b-print2").addEventListener("click", function(){ window.print(); });
+
+  document.getElementById("b-export").addEventListener("click", function(){
+    var nm = "dnevnik-nedelya-" + (state.week.weekNo || "I") + ".json";
+    download(nm, JSON.stringify(state, null, 2));
+  });
+
+  document.getElementById("b-import").addEventListener("click", function(){
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".json,application/json";
+    inp.addEventListener("change", function(){
+      var f = inp.files && inp.files[0];
+      if(!f) return;
+      var r = new FileReader();
+      r.onload = function(){
+        try{
+          var s = JSON.parse(String(r.result));
+          if(!s.week || !s.week.days) throw new Error("bad");
+          state = s;
+          if(!state.meta) state.meta = defaults().meta;
+          if(!state.archive) state.archive = [];
+          save(); renderAll(); bindMeta();
+        }catch(e){
+          alert("Не удалось прочитать файл: в нём нет недели с днями. Нужен файл, сохранённый этим же дневником.");
+        }
+      };
+      r.readAsText(f, "utf-8");
+    });
+    inp.click();
+  });
+
+  document.getElementById("b-next").addEventListener("click", function(){
+    if(confirm("Закрыть неделю " + state.week.weekNo + " и начать следующую?\n\nНевыполненные задания перенесутся как хвосты. Текущая неделя сохранится в архиве файла.")) nextWeek();
+  });
+
+  document.getElementById("b-reset").addEventListener("click", function(){
+    if(confirm("Стереть весь дневник и вернуть исходную неделю? Отменить будет нельзя.")){
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      state = defaults(); save(); renderAll(); bindMeta();
+    }
+  });
+}
+
+/* ================= СТАРТ ================= */
+function renderAll(){
+  renderWeek();
+  renderTT();
+  renderHabits();
+  renderSummary();
+}
+
+state = load();
+renderAll();
+bindMeta();
+bindTabs();
+bindButtons();
+
+/* Офлайн и установка на телефон. По file:// служебный работник не
+   регистрируется — это нормально, дневник и так локальный. */
+if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+})();
+</script>
+</body>
+</html>
